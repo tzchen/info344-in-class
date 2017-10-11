@@ -1,6 +1,6 @@
 package handlers
 
-import "github.com/info344-a17/info344-in-class/zipsvr/models"
+import "github.com/tzchen/info344-in-class/zipsvr/models"
 import "net/http"
 import "strings"
 import "encoding/json"

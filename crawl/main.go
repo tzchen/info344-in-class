@@ -9,7 +9,13 @@ const usage = `
 usage:
 	crawl <starting-url>
 `
-const numWorkers = 20
+
+//numWorkers is the number of worker goroutines
+//we will start: begin with just 1 and increase
+//to see the benefits of concurrent execution,
+//but don't increase beyond the number of concurrent
+//socket connections allowed by your OS
+const numWorkers = 1
 
 func main() {
 	if len(os.Args) < 2 {

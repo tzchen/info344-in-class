@@ -32,7 +32,8 @@ func NewWebSocketsHandler(notifer *Notifier) *WebSocketsHandler {
 func (wsh *WebSocketsHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	log.Println("received websocket upgrade request")
 	//TODO: Upgrade the connection to a WebSocket, and add the
-	//new websock.Conn to the Notifier
+	//new websock.Conn to the Notifier. See
+	//https://godoc.org/github.com/gorilla/websocket#hdr-Overview
 }
 
 //Notifier is an object that handles WebSocket notifications
@@ -40,7 +41,7 @@ type Notifier struct {
 	clients []*websocket.Conn
 	eventQ  chan []byte
 	//TODO: add a mutex or other channels to
-	//protect the `clients` slice
+	//protect the `clients` slice from concurrent use.
 }
 
 //NewNotifier constructs a new Notifier

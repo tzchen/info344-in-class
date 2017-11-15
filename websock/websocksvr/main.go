@@ -8,15 +8,21 @@ import (
 	"time"
 )
 
-func sendNotifications(notifier *Notifier) {
-	for {
-		//every second...
-		time.Sleep(time.Second)
-		//send a notification message to the all WebSocket clients
-		log.Printf("notifying clients with test message")
-		msg := fmt.Sprintf("test message pushed to client at %v", time.Now())
-		notifier.Notify([]byte(msg))
-	}
+//NotificationsHandler handles requests for the /notifications resource
+type NotificationsHandler struct {
+	notifier *Notifier
+}
+
+//NewNotificationsHandler constructs a new NotificationsHandler
+func NewNotificationsHandler(notifier *Notifier) *NotificationsHandler {
+	return &NotificationsHandler{notifier}
+}
+
+//ServeHTTP handles HTTP requests for the NotificationsHandler
+func (nh *NotificationsHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	w.Header().Add("Access-Control-Allow-Origin", "*")
+	msg := fmt.Sprintf("Notification pushed from the server at %s", time.Now().Format("15:04:05"))
+	nh.notifier.Notify([]byte(msg))
 }
 
 func main() {
@@ -25,14 +31,11 @@ func main() {
 		addr = ":80"
 	}
 
-	//create a notifier and start a goroutine
-	//that repeatedly sends notifications to all
-	//WebSocket clients
 	notifier := NewNotifier()
-	go sendNotifications(notifier)
 
 	mux := http.NewServeMux()
 	mux.Handle("/websockets", NewWebSocketsHandler(notifier))
+	mux.Handle("/notifications", NewNotificationsHandler(notifier))
 
 	log.Printf("server is listening at http://%s...", addr)
 	log.Fatal(http.ListenAndServe(addr, mux))

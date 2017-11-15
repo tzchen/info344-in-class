@@ -1,0 +1,29 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta http-equiv="X-UA-Compatible" content="ie=edge">
+    <title>WebScokets Demo</title>
+</head>
+<body>
+    <h1>WebSocket Notifications</h1>
+    <div id="messages"></div>
+    <script>
+        let msgsDiv = document.querySelector("#messages");
+        let websocket = new WebSocket("ws://localhost:4000/websockets");
+        websocket.addEventListener("error", function(err) {
+            msgsDiv.textContent = err.message;
+        });
+        websocket.addEventListener("open", function() {
+            msgsDiv.textContent = "websocket is open";
+        });
+        websocket.addEventListener("close", function() {
+            msgsDiv.textContent = "websocket is closed";
+        });
+        websocket.addEventListener("message", function(event) {
+            msgsDiv.textContent = event.data;
+        });
+    </script>
+</body>
+</html>

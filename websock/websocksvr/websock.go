@@ -3,6 +3,7 @@ package main
 import (
 	"log"
 	"net/http"
+	"sync"
 
 	"github.com/gorilla/websocket"
 )
@@ -24,8 +25,18 @@ type WebSocketsHandler struct {
 }
 
 //NewWebSocketsHandler constructs a new WebSocketsHandler
-func NewWebSocketsHandler(notifer *Notifier) *WebSocketsHandler {
-	panic("TOOD:")
+func NewWebSocketsHandler(notifier *Notifier) *WebSocketsHandler {
+	upgrader := websocket.Upgrader{
+		ReadBufferSize:  1024,
+		WriteBufferSize: 1024,
+		CheckOrigin:     func(r *http.Request) bool { return true },
+	}
+
+	return &WebSocketsHandler{
+		notifier: notifier,
+		upgrader: &upgrader,
+	}
+
 }
 
 //ServeHTTP implements the http.Handler interface for the WebSocketsHandler
@@ -34,14 +45,26 @@ func (wsh *WebSocketsHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) 
 	//TODO: Upgrade the connection to a WebSocket, and add the
 	//new websock.Conn to the Notifier. See
 	//https://godoc.org/github.com/gorilla/websocket#hdr-Overview
+
+	conn, err := wsh.upgrader.Upgrade(w, r, nil)
+	if err != nil {
+		log.Println(err)
+		return
+	}
+
+	go wsh.notifier.AddClient(conn)
+	go wsh.notifier.start()
+
+	// notifier.notify?
 }
 
 //Notifier is an object that handles WebSocket notifications
 type Notifier struct {
-	clients []*websocket.Conn
+	clients []*websocket.Conn // not safe for concurrent RW
 	eventQ  chan []byte
 	//TODO: add a mutex or other channels to
 	//protect the `clients` slice from concurrent use.
+	mx sync.RWMutex
 }
 
 //NewNotifier constructs a new Notifier
@@ -50,7 +73,10 @@ func NewNotifier() *Notifier {
 	//and call the .start() method on
 	//a new goroutine to start the
 	//event notification loop
-	panic("TODO:")
+	return &Notifier{
+		clients: []*websocket.Conn{},
+		eventQ:  make(chan []byte),
+	}
 }
 
 //AddClient adds a new client to the Notifier
@@ -61,15 +87,36 @@ func (n *Notifier) AddClient(client *websocket.Conn) {
 	//goroutines, make sure you protect the `clients`
 	//slice while you add a new connection to it!
 
+	n.mx.Lock()
+	n.clients = append(n.clients, client)
+	n.mx.Unlock()
+
+	tempClients := []*websocket.Conn{}
 	//also process incoming control messages from
 	//the client, as described in this section of the docs:
 	//https://godoc.org/github.com/gorilla/websocket#hdr-Control_Messages
+
+	for {
+		if _, _, err := client.NextReader(); err != nil {
+			client.Close()
+			n.mx.Lock()
+			for _, c := range n.clients {
+				if c != client {
+					tempClients = append(tempClients, c)
+				}
+			}
+			n.clients = tempClients
+			n.mx.Unlock()
+			break
+		}
+	}
 }
 
 //Notify broadcasts the event to all WebSocket clients
 func (n *Notifier) Notify(event []byte) {
 	log.Printf("adding event to the queue")
 	//TODO: add `event` to the `n.eventQ`
+	n.eventQ <- event
 }
 
 //start starts the notification loop
@@ -78,6 +125,20 @@ func (n *Notifier) start() {
 	//TODO: start a never-ending loop that reads
 	//new events out of the `n.eventQ` and broadcasts
 	//them to all WebSocket clients.
+
+	for {
+		event := <-n.eventQ
+		log.Printf("event: %v", event)
+		n.mx.RLock()
+		for _, conn := range n.clients {
+			if err := conn.WriteMessage(websocket.TextMessage, event); err != nil {
+				log.Println(err)
+				return
+			}
+		}
+		n.mx.RUnlock()
+	}
+
 	//If you use additional channels instead of a mutex
 	//to protext the `clients` slice, also process those
 	//channels here using a non-blocking `select` statement
